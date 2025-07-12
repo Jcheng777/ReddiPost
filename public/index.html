@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Reddit OAuth Demo</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 20px;
+      background-color: #f5f5f5;
+    }
+
+    .container {
+      background: white;
+      padding: 30px;
+      border-radius: 10px;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+    }
+
+    .btn {
+      background: #ff4500;
+      color: white;
+      padding: 12px 24px;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      font-size: 16px;
+      margin: 10px 5px;
+    }
+
+    .btn:hover {
+      background: #e03d00;
+    }
+
+    .btn:disabled {
+      background: #ccc;
+      cursor: not-allowed;
+    }
+
+    .user-info {
+      background: #f8f9fa;
+      padding: 20px;
+      border-radius: 5px;
+      margin: 20px 0;
+      border-left: 4px solid #ff4500;
+    }
+
+    .error {
+      background: #f8d7da;
+      color: #721c24;
+      padding: 15px;
+      border-radius: 5px;
+      margin: 10px 0;
+    }
+
+    .success {
+      background: #d4edda;
+      color: #155724;
+      padding: 15px;
+      border-radius: 5px;
+      margin: 10px 0;
+    }
+
+    pre {
+      background: #f8f9fa;
+      padding: 15px;
+      border-radius: 5px;
+      overflow-x: auto;
+    }
+
+    .status {
+      padding: 10px;
+      border-radius: 5px;
+      margin: 10px 0;
+    }
+
+    .status.authenticated {
+      background: #d4edda;
+      color: #155724;
+    }
+
+    .status.not-authenticated {
+      background: #fff3cd;
+      color: #856404;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="container">
+    <h1>Reddit OAuth Demo</h1>
+
+    <div id="status" class="status not-authenticated">
+      Status: Not authenticated
+    </div>
+
+    <div id="auth-section">
+      <h2>Authentication</h2>
+      <button id="loginBtn" class="btn">Login with Reddit</button>
+      <button id="logoutBtn" class="btn" style="display: none;">Logout</button>
+    </div>
+
+    <div id="user-section" style="display: none;">
+      <h2>User Information</h2>
+      <button id="getUserBtn" class="btn">Get User Info</button>
+      <button id="getPostsBtn" class="btn">Get My Posts</button>
+      <div id="userInfo"></div>
+
+      <h2>Post Content</h2>
+      <div style="background: #f8f9fa; padding: 20px; border-radius: 5px; margin: 20px 0;">
+        <h3>Submit a Post</h3>
+        <form id="submitForm">
+          <div style="margin-bottom: 15px;">
+            <label for="subreddit">Subreddit:</label>
+            <input type="text" id="subreddit" placeholder="e.g., test" required
+              style="width: 100%; padding: 8px; margin-top: 5px;">
+          </div>
+          <div style="margin-bottom: 15px;">
+            <label for="title">Title:</label>
+            <input type="text" id="title" placeholder="Post title" required
+              style="width: 100%; padding: 8px; margin-top: 5px;">
+          </div>
+          <div style="margin-bottom: 15px;">
+            <label for="content">Content:</label>
+            <textarea id="content" placeholder="Post content (for text posts) or URL (for link posts)" rows="4"
+              style="width: 100%; padding: 8px; margin-top: 5px;"></textarea>
+          </div>
+          <div style="margin-bottom: 15px;">
+            <label for="postType">Post Type:</label>
+            <select id="postType" style="width: 100%; padding: 8px; margin-top: 5px;">
+              <option value="self">Text Post</option>
+              <option value="link">Link Post</option>
+            </select>
+          </div>
+          <button type="submit" class="btn">Submit Post</button>
+        </form>
+      </div>
+
+      <div style="background: #f8f9fa; padding: 20px; border-radius: 5px; margin: 20px 0;">
+        <h3>Submit a Comment</h3>
+        <form id="commentForm">
+          <div style="margin-bottom: 15px;">
+            <label for="parentId">Parent ID (post or comment ID):</label>
+            <input type="text" id="parentId" placeholder="e.g., t3_abc123" required
+              style="width: 100%; padding: 8px; margin-top: 5px;">
+          </div>
+          <div style="margin-bottom: 15px;">
+            <label for="commentText">Comment:</label>
+            <textarea id="commentText" placeholder="Your comment" rows="4" required
+              style="width: 100%; padding: 8px; margin-top: 5px;"></textarea>
+          </div>
+          <button type="submit" class="btn">Submit Comment</button>
+        </form>
+      </div>
+    </div>
+
+    <div id="messages"></div>
+  </div>
+
+  <script>
+    const API_BASE = 'http://localhost:3000';
+
+    // Check authentication status on page load
+    checkAuthStatus();
+
+    // Event listeners
+    document.getElementById('loginBtn').addEventListener('click', initiateLogin);
+    document.getElementById('logoutBtn').addEventListener('click', logout);
+    document.getElementById('getUserBtn').addEventListener('click', getUserInfo);
+    document.getElementById('getPostsBtn').addEventListener('click', getUserPosts);
+    document.getElementById('submitForm').addEventListener('submit', submitPost);
+    document.getElementById('commentForm').addEventListener('submit', submitComment);
+
+    async function checkAuthStatus() {
+      try {
+        const response = await fetch(`${API_BASE}/health`);
+        const data = await response.json();
+
+        const statusDiv = document.getElementById('status');
+        const loginBtn = document.getElementById('loginBtn');
+        const logoutBtn = document.getElementById('logoutBtn');
+        const userSection = document.getElementById('user-section');
+
+        if (data.authenticated) {
+          statusDiv.textContent = 'Status: Authenticated';
+          statusDiv.className = 'status authenticated';
+          loginBtn.style.display = 'none';
+          logoutBtn.style.display = 'inline-block';
+          userSection.style.display = 'block';
+        } else {
+          statusDiv.textContent = 'Status: Not authenticated';
+          statusDiv.className = 'status not-authenticated';
+          loginBtn.style.display = 'inline-block';
+          logoutBtn.style.display = 'none';
+          userSection.style.display = 'none';
+        }
+      } catch (error) {
+        showMessage('Error checking auth status: ' + error.message, 'error');
+      }
+    }
+
+    async function initiateLogin() {
+      try {
+        const response = await fetch(`${API_BASE}/auth/login`);
+        const data = await response.json();
+
+        // Redirect to Reddit's authorization page
+        window.location.href = data.authUrl;
+      } catch (error) {
+        showMessage('Error initiating login: ' + error.message, 'error');
+      }
+    }
+
+    async function logout() {
+      try {
+        const response = await fetch(`${API_BASE}/auth/logout`, {
+          method: 'POST'
+        });
+        const data = await response.json();
+
+        showMessage(data.message, 'success');
+        checkAuthStatus();
+        document.getElementById('userInfo').innerHTML = '';
+      } catch (error) {
+        showMessage('Error logging out: ' + error.message, 'error');
+      }
+    }
+
+    async function getUserInfo() {
+      try {
+        const response = await fetch(`${API_BASE}/api/user`);
+        const data = await response.json();
+
+        if (response.ok) {
+          const userInfoDiv = document.getElementById('userInfo');
+          userInfoDiv.innerHTML = `
+                        <div class="user-info">
+                            <h3>User Information</h3>
+                            <p><strong>Username:</strong> ${data.name}</p>
+                            <p><strong>ID:</strong> ${data.id}</p>
+                            <p><strong>Created:</strong> ${new Date(data.created_utc * 1000).toLocaleDateString()}</p>
+                            <p><strong>Link Karma:</strong> ${data.link_karma}</p>
+                            <p><strong>Comment Karma:</strong> ${data.comment_karma}</p>
+                            <p><strong>Is Gold:</strong> ${data.is_gold ? 'Yes' : 'No'}</p>
+                            <p><strong>Is Mod:</strong> ${data.is_mod ? 'Yes' : 'No'}</p>
+                        </div>
+                    `;
+        } else {
+          showMessage('Error getting user info: ' + data.error, 'error');
+        }
+      } catch (error) {
+        showMessage('Error getting user info: ' + error.message, 'error');
+      }
+    }
+
+    async function getUserPosts() {
+      try {
+        const response = await fetch(`${API_BASE}/api/user/posts`);
+        const data = await response.json();
+
+        if (response.ok) {
+          const userInfoDiv = document.getElementById('userInfo');
+          let postsHtml = '<div class="user-info"><h3>Recent Posts</h3>';
+
+          if (data.data && data.data.children && data.data.children.length > 0) {
+            data.data.children.forEach(post => {
+              const postData = post.data;
+              postsHtml += `
+                                <div style="border-bottom: 1px solid #eee; padding: 10px 0;">
+                                    <h4><a href="https://reddit.com${postData.permalink}" target="_blank">${postData.title}</a></h4>
+                                    <p><strong>Subreddit:</strong> r/${postData.subreddit}</p>
+                                    <p><strong>Score:</strong> ${postData.score}</p>
+                                    <p><strong>Posted:</strong> ${new Date(postData.created_utc * 1000).toLocaleDateString()}</p>
+                                </div>
+                            `;
+            });
+          } else {
+            postsHtml += '<p>No posts found or no posts available.</p>';
+          }
+
+          postsHtml += '</div>';
+          userInfoDiv.innerHTML = postsHtml;
+        } else {
+          showMessage('Error getting posts: ' + data.error, 'error');
+        }
+      } catch (error) {
+        showMessage('Error getting posts: ' + error.message, 'error');
+      }
+    }
+
+    async function submitPost(event) {
+      event.preventDefault();
+
+      const subreddit = document.getElementById('subreddit').value;
+      const title = document.getElementById('title').value;
+      const content = document.getElementById('content').value;
+      const postType = document.getElementById('postType').value;
+
+      try {
+        const response = await fetch(`${API_BASE}/api/submit`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            subreddit: subreddit,
+            title: title,
+            content: content,
+            kind: postType
+          })
+        });
+
+        const data = await response.json();
+
+        if (response.ok) {
+          showMessage('Post submitted successfully!', 'success');
+          // Clear form
+          document.getElementById('submitForm').reset();
+        } else {
+          showMessage('Error submitting post: ' + data.error, 'error');
+        }
+      } catch (error) {
+        showMessage('Error submitting post: ' + error.message, 'error');
+      }
+    }
+
+    async function submitComment(event) {
+      event.preventDefault();
+
+      const parentId = document.getElementById('parentId').value;
+      const commentText = document.getElementById('commentText').value;
+
+      try {
+        const response = await fetch(`${API_BASE}/api/comment`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            parent: parentId,
+            text: commentText
+          })
+        });
+
+        const data = await response.json();
+
+        if (response.ok) {
+          showMessage('Comment submitted successfully!', 'success');
+          // Clear form
+          document.getElementById('commentForm').reset();
+        } else {
+          showMessage('Error submitting comment: ' + data.error, 'error');
+        }
+      } catch (error) {
+        showMessage('Error submitting comment: ' + error.message, 'error');
+      }
+    }
+
+    function showMessage(message, type) {
+      const messagesDiv = document.getElementById('messages');
+      const messageDiv = document.createElement('div');
+      messageDiv.className = type;
+      messageDiv.textContent = message;
+      messagesDiv.appendChild(messageDiv);
+
+      // Remove message after 5 seconds
+      setTimeout(() => {
+        messageDiv.remove();
+      }, 5000);
+    }
+
+    // Check if we're returning from Reddit OAuth callback
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get('code')) {
+      // We have an authorization code, check auth status
+      setTimeout(checkAuthStatus, 1000);
+    }
+  </script>
+</body>
+
+</html>
