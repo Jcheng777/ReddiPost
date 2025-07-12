@@ -1,18 +1,22 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { useSearchParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Copy, ThumbsUp, ArrowLeft, Sparkles, Send, CheckCircle, ExternalLink } from "lucide-react"
+import { Copy, ThumbsUp, ArrowLeft, Sparkles, Send, CheckCircle, ExternalLink, Save } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { toast } from "@/components/ui/use-toast"
 import { Toaster } from "@/components/ui/toaster"
 import Link from "next/link"
-import type { SavedSubreddit } from "@/lib/supabase"
+import type { SavedSubreddit, Post } from "@/lib/supabase"
 
 export default function CreatePostPage() {
+  const searchParams = useSearchParams()
+  const draftId = searchParams.get('draft')
+  
   const [selectedSubreddit, setSelectedSubreddit] = useState("")
   const [selectedTone, setSelectedTone] = useState("")
   const [postTitle, setPostTitle] = useState("")
@@ -26,11 +30,17 @@ export default function CreatePostPage() {
   const [loadingSubreddits, setLoadingSubreddits] = useState(true)
   const [postSubmitted, setPostSubmitted] = useState(false)
   const [submittedPostUrl, setSubmittedPostUrl] = useState("")
+  const [loadingDraft, setLoadingDraft] = useState(false)
+  const [draftSaved, setDraftSaved] = useState(false)
+  const [savingDraft, setSavingDraft] = useState(false)
 
-  // Fetch saved subreddits on component mount
+  // Fetch saved subreddits and draft on component mount
   useEffect(() => {
     fetchSavedSubreddits()
-  }, [])
+    if (draftId) {
+      loadDraft(draftId)
+    }
+  }, [draftId])
 
   const fetchSavedSubreddits = async () => {
     try {
@@ -48,6 +58,37 @@ export default function CreatePostPage() {
       })
     } finally {
       setLoadingSubreddits(false)
+    }
+  }
+
+  const loadDraft = async (id: string) => {
+    setLoadingDraft(true)
+    try {
+      const response = await fetch(`/api/posts/${id}`)
+      if (response.ok) {
+        const { data } = await response.json()
+        setPostTitle(data.title)
+        setPostBody(data.body)
+        setPostTldr(data.tldr || '')
+        setSelectedSubreddit(data.subreddit_name)
+        setSelectedTone(data.tone || '')
+        setPostGenerated(true)
+        toast({
+          title: "Draft loaded",
+          description: "Your draft has been loaded successfully",
+        })
+      } else {
+        throw new Error('Failed to load draft')
+      }
+    } catch (error) {
+      console.error('Error loading draft:', error)
+      toast({
+        title: "Error",
+        description: "Failed to load draft",
+        variant: "destructive",
+      })
+    } finally {
+      setLoadingDraft(false)
     }
   }
 
@@ -114,6 +155,7 @@ export default function CreatePostPage() {
   }
 
   const saveDraft = async () => {
+    setSavingDraft(true)
     try {
       const response = await fetch('/api/posts', {
         method: 'POST',
@@ -132,10 +174,7 @@ export default function CreatePostPage() {
       })
 
       if (response.ok) {
-        toast({
-          title: "Draft saved!",
-          description: "Your post has been saved to drafts",
-        })
+        setDraftSaved(true)
       } else {
         throw new Error('Failed to save draft')
       }
@@ -146,6 +185,8 @@ export default function CreatePostPage() {
         description: "Failed to save draft. Please try again.",
         variant: "destructive",
       })
+    } finally {
+      setSavingDraft(false)
     }
   }
 
@@ -168,7 +209,62 @@ export default function CreatePostPage() {
       </div>
 
       <div className="max-w-3xl">
-        {postSubmitted ? (
+        {draftSaved ? (
+          /* Draft Saved Success Screen */
+          <Card>
+            <CardContent className="pt-6">
+              <div className="text-center space-y-4">
+                <Save className="h-16 w-16 text-blue-500 mx-auto" />
+                <h2 className="text-2xl font-bold">Draft Saved Successfully!</h2>
+                <p className="text-muted-foreground">
+                  Your post has been saved to drafts for {selectedSubreddit}
+                </p>
+                
+                <div className="pt-4 space-y-3">
+                  <Link href="/dashboard/drafts" className="block">
+                    <Button className="w-full">
+                      View All Drafts
+                    </Button>
+                  </Link>
+                  
+                  <Button 
+                    variant="outline" 
+                    className="w-full"
+                    onClick={() => {
+                      setDraftSaved(false)
+                      setPostGenerated(true)
+                    }}
+                  >
+                    Continue Editing
+                  </Button>
+                  
+                  <Link href="/dashboard" className="block">
+                    <Button variant="outline" className="w-full">
+                      Back to Dashboard
+                    </Button>
+                  </Link>
+                  
+                  <Button 
+                    variant="outline" 
+                    className="w-full"
+                    onClick={() => {
+                      setPostGenerated(false)
+                      setDraftSaved(false)
+                      setPostTitle("")
+                      setPostBody("")
+                      setPostTldr("")
+                      setProductDescription("")
+                      setSelectedSubreddit("")
+                      setSelectedTone("")
+                    }}
+                  >
+                    Create New Post
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        ) : postSubmitted ? (
           /* Success Screen */
           <Card>
             <CardContent className="pt-6">
@@ -379,8 +475,22 @@ export default function CreatePostPage() {
                 Start Over
               </Button>
               <div className="flex space-x-2">
-                <Button variant="outline" onClick={saveDraft}>
-                  Save Draft
+                <Button 
+                  variant="outline" 
+                  onClick={saveDraft}
+                  disabled={savingDraft}
+                >
+                  {savingDraft ? (
+                    <>
+                      <Save className="h-4 w-4 mr-2 animate-pulse" />
+                      Saving...
+                    </>
+                  ) : (
+                    <>
+                      <Save className="h-4 w-4 mr-2" />
+                      Save Draft
+                    </>
+                  )}
                 </Button>
                 <Button
                   variant="outline"
