@@ -1,23 +1,80 @@
-# Reddit OAuth Authentication Demo
+# ReddiPost - Reddit Post Generator
 
-This project demonstrates how to authenticate with Reddit using OAuth 2.0 to access user account information and posts.
+A Next.js application that helps users discover relevant subreddits and generate posts that match community guidelines.
 
 ## Features
 
-- ✅ Reddit OAuth 2.0 authentication flow
-- ✅ Access token management with refresh capability
-- ✅ User profile information retrieval
-- ✅ User posts retrieval
-- ✅ Simple web interface for testing
-- ✅ Automatic token refresh on expiration
+- ✅ Reddit OAuth 2.0 authentication
+- ✅ Subreddit discovery and saving
+- ✅ AI-powered post generation with GPT
+- ✅ Draft management
+- ✅ Post tracking and history
+- ✅ Billing integration with Flowglad
+
+## Tech Stack
+
+- **Framework**: Next.js 15 with App Router
+- **Database**: Supabase (PostgreSQL)
+- **Authentication**: Custom Reddit OAuth
+- **AI**: OpenAI GPT API
+- **Billing**: Flowglad
+- **Styling**: Tailwind CSS + shadcn/ui
 
 ## Prerequisites
 
 1. **Reddit App Registration**: You need to create a Reddit app at https://www.reddit.com/prefs/apps
-2. **Node.js**: Version 14 or higher
+2. **Node.js**: Version 18 or higher
 3. **npm**: For package management
+4. **Supabase Account**: For database
+5. **OpenAI API Key**: For post generation
+6. **Flowglad Account**: For billing integration
 
-## Setup Instructions
+## Deployment on Vercel
+
+### Quick Deploy
+
+1. **Fork or clone this repository** to your GitHub account
+
+2. **Import to Vercel**:
+   - Go to [vercel.com](https://vercel.com)
+   - Click "Import Project"
+   - Select your GitHub repository
+   - Vercel will automatically detect it's a Next.js project
+
+3. **Configure Environment Variables** in Vercel dashboard:
+   ```
+   NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
+   NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
+   SUPABASE_SERVICE_ROLE_KEY=your_supabase_service_role_key
+   REDDIT_CLIENT_ID=your_reddit_client_id
+   REDDIT_CLIENT_SECRET=your_reddit_client_secret
+   REDDIT_REDIRECT_URI=https://your-app.vercel.app/auth/callback
+   SESSION_SECRET=generate_a_random_32_char_string
+   OPENAI_API_KEY=your_openai_api_key
+   FLOWGLAD_SECRET_KEY=your_flowglad_secret_key
+   ```
+
+4. **Deploy**:
+   - Click "Deploy"
+   - Wait for the build to complete
+   - Your app will be live at `https://your-app.vercel.app`
+
+### Post-Deployment Steps
+
+1. **Update Reddit App**:
+   - Go to your Reddit app settings
+   - Update the redirect URI to `https://your-app.vercel.app/auth/callback`
+
+2. **Configure Supabase**:
+   - Ensure your Supabase project URL is accessible
+   - Check that RLS policies are properly configured
+
+3. **Test the deployment**:
+   - Visit your deployed URL
+   - Try logging in with Reddit
+   - Test all features
+
+## Local Development Setup
 
 ### 1. Create a Reddit App
 
@@ -35,42 +92,118 @@ This project demonstrates how to authenticate with Reddit using OAuth 2.0 to acc
 ### 2. Install Dependencies
 
 ```bash
-npm install
+npm install --legacy-peer-deps
 ```
+
+Note: We use `--legacy-peer-deps` due to peer dependency conflicts with some packages.
 
 ### 3. Configure Environment Variables
 
-Create a `.env` file in the project root:
-
-```bash
-cp env.example .env
-```
-
-Edit the `.env` file with your Reddit app credentials:
+Create a `.env.local` file in the project root:
 
 ```env
-# Reddit OAuth Credentials
-REDDIT_CLIENT_ID=your_client_id_here
-REDDIT_CLIENT_SECRET=your_client_secret_here
+# Supabase
+NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
+SUPABASE_SERVICE_ROLE_KEY=your_supabase_service_role_key
+
+# Reddit OAuth
+REDDIT_CLIENT_ID=your_reddit_client_id
+REDDIT_CLIENT_SECRET=your_reddit_client_secret
 REDDIT_REDIRECT_URI=http://localhost:3000/auth/callback
 
-# Server Configuration
-PORT=3000
+# Session
+SESSION_SECRET=your_session_secret_32_chars
+
+# OpenAI
+OPENAI_API_KEY=your_openai_api_key
+
+# Flowglad
+FLOWGLAD_SECRET_KEY=your_flowglad_secret_key
 ```
 
-### 4. Start the Server
+### 4. Set up Supabase Database
 
-```bash
-npm start
+Run the following SQL in your Supabase SQL editor:
+
+```sql
+-- Create saved_subreddits table
+CREATE TABLE saved_subreddits (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_id TEXT NOT NULL,
+  subreddit_name TEXT NOT NULL,
+  subreddit_display_name TEXT NOT NULL,
+  subreddit_icon_url TEXT,
+  subreddit_description TEXT,
+  subscriber_count INTEGER,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  UNIQUE(user_id, subreddit_name)
+);
+
+-- Create posts table
+CREATE TABLE posts (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_id TEXT NOT NULL,
+  reddit_post_id TEXT,
+  reddit_post_url TEXT,
+  title TEXT NOT NULL,
+  body TEXT NOT NULL,
+  tldr TEXT,
+  subreddit_name TEXT NOT NULL,
+  subreddit_display_name TEXT NOT NULL,
+  tone TEXT,
+  status TEXT NOT NULL CHECK (status IN ('draft', 'published', 'scheduled')),
+  upvotes INTEGER DEFAULT 0,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  submitted_at TIMESTAMP WITH TIME ZONE,
+  scheduled_for TIMESTAMP WITH TIME ZONE
+);
+
+-- Enable RLS
+ALTER TABLE saved_subreddits ENABLE ROW LEVEL SECURITY;
+ALTER TABLE posts ENABLE ROW LEVEL SECURITY;
+
+-- Create RLS policies
+CREATE POLICY "Users can manage their own saved subreddits" ON saved_subreddits
+  FOR ALL USING (true);
+
+CREATE POLICY "Users can manage their own posts" ON posts
+  FOR ALL USING (true);
 ```
 
-Or for development with auto-restart:
+### 5. Start the Development Server
 
 ```bash
 npm run dev
 ```
 
-The server will start on `http://localhost:3000`
+The app will start on `http://localhost:3000`
+
+## Project Structure
+
+```
+/
+├── app/                    # Next.js App Router
+│   ├── api/               # API routes
+│   │   ├── auth/          # Reddit OAuth endpoints
+│   │   ├── generate-post/ # GPT post generation
+│   │   ├── posts/         # Post management
+│   │   └── subreddits/    # Subreddit management
+│   ├── dashboard/         # Main app pages
+│   │   ├── create/        # Post creation
+│   │   ├── discover/      # Subreddit discovery
+│   │   ├── drafts/        # Draft management
+│   │   └── settings/      # User settings & billing
+│   └── layout.tsx         # Root layout
+├── components/            # React components
+├── lib/                   # Utility functions
+│   ├── auth.ts           # Reddit auth helpers
+│   ├── reddit-api.ts     # Reddit API client
+│   ├── supabase.ts       # Supabase client
+│   ├── openai.ts         # OpenAI integration
+│   └── flowglad.ts       # Billing integration
+└── vercel.json           # Vercel configuration
+```
 
 ## How It Works
 

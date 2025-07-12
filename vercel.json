@@ -1,0 +1,20 @@
+{
+  "framework": "nextjs",
+  "buildCommand": "npm run build",
+  "outputDirectory": ".next",
+  "installCommand": "npm install --legacy-peer-deps",
+  "corepack": {
+    "enabled": false
+  },
+  "env": {
+    "NEXT_PUBLIC_SUPABASE_URL": "@supabase_url",
+    "NEXT_PUBLIC_SUPABASE_ANON_KEY": "@supabase_anon_key",
+    "SUPABASE_SERVICE_ROLE_KEY": "@supabase_service_role_key",
+    "REDDIT_CLIENT_ID": "@reddit_client_id",
+    "REDDIT_CLIENT_SECRET": "@reddit_client_secret",
+    "REDDIT_REDIRECT_URI": "@reddit_redirect_uri",
+    "SESSION_SECRET": "@session_secret",
+    "OPENAI_API_KEY": "@openai_api_key",
+    "FLOWGLAD_SECRET_KEY": "@flowglad_secret_key"
+  }
+}
