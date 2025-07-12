@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge"
 import { toast } from "@/components/ui/use-toast"
 import { Toaster } from "@/components/ui/toaster"
 import Link from "next/link"
+import type { SavedSubreddit } from "@/lib/supabase"
 
 export default function CreatePostPage() {
   const [selectedSubreddit, setSelectedSubreddit] = useState("")
@@ -20,40 +21,33 @@ export default function CreatePostPage() {
   const [loading, setLoading] = useState(false)
   const [postGenerated, setPostGenerated] = useState(false)
   const [submitting, setSubmitting] = useState(false)
+  const [productDescription, setProductDescription] = useState("")
+  const [savedSubreddits, setSavedSubreddits] = useState<SavedSubreddit[]>([])
+  const [loadingSubreddits, setLoadingSubreddits] = useState(true)
 
-  // Mock saved subreddits - in a real app, this would come from user's saved collections
-  const savedSubreddits = [
-    {
-      name: "r/SideProject",
-      description: "Share your side projects and get feedback",
-      collection: "Startup Communities",
-      allowsSelfPromo: true,
-    },
-    {
-      name: "r/startups",
-      description: "Startup founders sharing experiences",
-      collection: "Startup Communities",
-      allowsSelfPromo: true,
-    },
-    {
-      name: "r/Entrepreneur",
-      description: "Entrepreneurial discussions and advice",
-      collection: "Startup Communities",
-      allowsSelfPromo: true,
-    },
-    {
-      name: "r/webdev",
-      description: "Web development community",
-      collection: "Tech & Development",
-      allowsSelfPromo: false,
-    },
-    {
-      name: "r/indiehackers",
-      description: "Independent developers building businesses",
-      collection: "Startup Communities",
-      allowsSelfPromo: true,
-    },
-  ]
+  // Fetch saved subreddits on component mount
+  useEffect(() => {
+    fetchSavedSubreddits()
+  }, [])
+
+  const fetchSavedSubreddits = async () => {
+    try {
+      const response = await fetch('/api/subreddits/saved')
+      if (response.ok) {
+        const { data } = await response.json()
+        setSavedSubreddits(data)
+      }
+    } catch (error) {
+      console.error('Error fetching saved subreddits:', error)
+      toast({
+        title: "Error",
+        description: "Failed to load saved subreddits",
+        variant: "destructive",
+      })
+    } finally {
+      setLoadingSubreddits(false)
+    }
+  }
 
   const toneOptions = [
     { value: "founder-story", label: "Founder Story", description: "Share your journey and lessons learned" },
@@ -81,7 +75,7 @@ export default function CreatePostPage() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          productDescription: "a tool that helps Reddit users generate engaging posts",
+          productDescription: productDescription || "a tool that helps Reddit users generate engaging posts",
           subreddit: selectedSubreddit,
           tone: selectedTone,
         }),
@@ -124,7 +118,7 @@ export default function CreatePostPage() {
     })
   }
 
-  const selectedSubredditData = savedSubreddits.find((s) => s.name === selectedSubreddit)
+  const selectedSubredditData = savedSubreddits.find((s) => s.subreddit_name === selectedSubreddit)
 
   return (
     <div className="p-6">
@@ -151,20 +145,39 @@ export default function CreatePostPage() {
               <CardDescription>Choose your target subreddit and the tone for your post</CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
+              {/* Product Description */}
+              <div>
+                <label className="text-sm font-medium mb-2 block">Product Description</label>
+                <Textarea
+                  placeholder="Briefly describe your product, tool, or project..."
+                  value={productDescription}
+                  onChange={(e) => setProductDescription(e.target.value)}
+                  rows={3}
+                  className="resize-none"
+                />
+                <p className="text-xs text-muted-foreground mt-1">
+                  This helps generate more relevant and engaging posts
+                </p>
+              </div>
+
               {/* Subreddit Selection */}
               <div>
                 <label className="text-sm font-medium mb-2 block">Select Subreddit</label>
-                <Select value={selectedSubreddit} onValueChange={setSelectedSubreddit}>
+                <Select value={selectedSubreddit} onValueChange={setSelectedSubreddit} disabled={loadingSubreddits}>
                   <SelectTrigger>
-                    <SelectValue placeholder="Choose from your saved subreddits" />
+                    <SelectValue placeholder={loadingSubreddits ? "Loading subreddits..." : "Choose from your saved subreddits"} />
                   </SelectTrigger>
                   <SelectContent>
                     {savedSubreddits.map((subreddit) => (
-                      <SelectItem key={subreddit.name} value={subreddit.name}>
+                      <SelectItem key={subreddit.id} value={subreddit.subreddit_name}>
                         <div className="flex items-center justify-between w-full">
                           <div>
-                            <div className="font-medium">{subreddit.name}</div>
-                            <div className="text-xs text-muted-foreground">{subreddit.description}</div>
+                            <div className="font-medium">{subreddit.subreddit_display_name}</div>
+                            {subreddit.subreddit_description && (
+                              <div className="text-xs text-muted-foreground line-clamp-1">
+                                {subreddit.subreddit_description}
+                              </div>
+                            )}
                           </div>
                         </div>
                       </SelectItem>
@@ -174,15 +187,18 @@ export default function CreatePostPage() {
                 {selectedSubredditData && (
                   <div className="mt-2 p-3 bg-accent/50 rounded-lg">
                     <div className="flex items-center gap-2 mb-1">
-                      <Badge variant="outline">{selectedSubredditData.collection}</Badge>
-                      <Badge variant={selectedSubredditData.allowsSelfPromo ? "default" : "secondary"}>
-                        {selectedSubredditData.allowsSelfPromo ? "Self-promo OK" : "No self-promo"}
-                      </Badge>
+                      {selectedSubredditData.subscriber_count && (
+                        <Badge variant="outline">
+                          {selectedSubredditData.subscriber_count.toLocaleString()} members
+                        </Badge>
+                      )}
                     </div>
-                    <p className="text-sm text-muted-foreground">{selectedSubredditData.description}</p>
+                    {selectedSubredditData.subreddit_description && (
+                      <p className="text-sm text-muted-foreground">{selectedSubredditData.subreddit_description}</p>
+                    )}
                   </div>
                 )}
-                {savedSubreddits.length === 0 && (
+                {!loadingSubreddits && savedSubreddits.length === 0 && (
                   <div className="mt-2 p-3 bg-muted rounded-lg text-center">
                     <p className="text-sm text-muted-foreground mb-2">No saved subreddits found</p>
                     <Link href="/dashboard/discover">
@@ -215,7 +231,7 @@ export default function CreatePostPage() {
               </div>
             </CardContent>
             <CardFooter className="flex justify-end">
-              <Button onClick={handleGeneratePost} disabled={loading || !selectedSubreddit || !selectedTone}>
+              <Button onClick={handleGeneratePost} disabled={loading || !selectedSubreddit || !selectedTone || !productDescription.trim()}>
                 {loading ? (
                   <>
                     <Sparkles className="h-4 w-4 mr-2 animate-spin" />

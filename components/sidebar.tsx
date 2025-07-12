@@ -12,7 +12,7 @@ const navigation = [
   { name: "Discover", href: "/dashboard/discover", icon: Search },
   { name: "Create Post", href: "/dashboard/create", icon: PenTool },
   { name: "Drafts & Scheduled", href: "/dashboard/drafts", icon: FolderOpen },
-  { name: "Saved Subreddits", href: "/dashboard/subreddits", icon: Bookmark },
+  { name: "Saved Subreddits", href: "/dashboard/saved", icon: Bookmark },
   { name: "Settings", href: "/dashboard/settings", icon: Settings },
   { name: "Profile", href: "/dashboard/profile", icon: User },
 ]

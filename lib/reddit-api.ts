@@ -144,6 +144,33 @@ class RedditAPI {
 
     return response.data;
   }
+
+  async searchSubreddits(query: string, limit: number = 10) {
+    const response = await this.axiosInstance.get('/subreddits/search', {
+      params: {
+        q: query,
+        limit: limit,
+        type: 'sr',
+        sort: 'relevance',
+      },
+    });
+
+    return response.data;
+  }
+
+  async getSubredditAbout(subredditName: string) {
+    const response = await this.axiosInstance.get(`/r/${subredditName}/about`);
+    return response.data;
+  }
+
+  async getSubredditRules(subredditName: string) {
+    try {
+      const response = await this.axiosInstance.get(`/r/${subredditName}/about/rules`);
+      return response.data;
+    } catch (error) {
+      return { rules: [] };
+    }
+  }
 }
 
 export const redditAPI = new RedditAPI();

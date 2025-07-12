@@ -179,6 +179,12 @@ export default function DashboardPage() {
                 View Drafts
               </Button>
             </Link>
+            <Link href="/dashboard/saved">
+              <Button variant="outline" className="w-full justify-start bg-transparent">
+                <Bookmark className="h-4 w-4 mr-2" />
+                View Saved Subreddits
+              </Button>
+            </Link>
           </CardContent>
         </Card>
 
