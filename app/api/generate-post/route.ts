@@ -120,9 +120,15 @@ Generate a ${toneConfig.name} post for ${subreddit}.`
 function getFallbackPost(productDescription: string, subreddit: string, tone: string) {
   const subredditName = subreddit.replace('r/', '');
   
+  // Extract a problem statement from the product description
+  // This is a simple extraction - just takes the first 50 chars or so
+  const problemStatement = productDescription.length > 50 
+    ? productDescription.substring(0, 50) + "..."
+    : productDescription;
+  
   const templates = {
     "founder-story": {
-      title: "I built a tool to solve [problem] after struggling with it myself",
+      title: `I built a tool after struggling with ${problemStatement}`,
       body: `Hey ${subredditName},\n\nAfter months of frustration with existing solutions, I decided to build something better. ${productDescription}\n\nThe journey wasn't easy - I spent countless nights coding and redesigning based on user feedback.\n\nI'd love to hear what you think and if this solves a pain point for you too. What features would you like to see added?`,
       tldr: "Built a tool to solve my own problem, would love your feedback!",
     },
@@ -132,7 +138,7 @@ function getFallbackPost(productDescription: string, subreddit: string, tone: st
       tldr: "Building a new tool, seeking honest feedback from the community.",
     },
     "question": {
-      title: "Has anyone found a good solution for [this problem]?",
+      title: `Has anyone found a good solution for ${problemStatement}?`,
       body: `I've been struggling with this challenge and wondering if anyone here has found a good approach.\n\n${productDescription}\n\nI'm considering building something to address this, but wanted to check:\n- What tools are you currently using?\n- What's working/not working?\n- Would something like this be useful?\n\nAppreciate any thoughts!`,
       tldr: "Looking for solutions to a problem, considering building something.",
     },

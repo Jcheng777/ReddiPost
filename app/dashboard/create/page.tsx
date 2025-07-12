@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Copy, ThumbsUp, ArrowLeft, Sparkles, Send } from "lucide-react"
+import { Copy, ThumbsUp, ArrowLeft, Sparkles, Send, CheckCircle, ExternalLink } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { toast } from "@/components/ui/use-toast"
 import { Toaster } from "@/components/ui/toaster"
@@ -24,6 +24,8 @@ export default function CreatePostPage() {
   const [productDescription, setProductDescription] = useState("")
   const [savedSubreddits, setSavedSubreddits] = useState<SavedSubreddit[]>([])
   const [loadingSubreddits, setLoadingSubreddits] = useState(true)
+  const [postSubmitted, setPostSubmitted] = useState(false)
+  const [submittedPostUrl, setSubmittedPostUrl] = useState("")
 
   // Fetch saved subreddits on component mount
   useEffect(() => {
@@ -111,11 +113,40 @@ export default function CreatePostPage() {
     })
   }
 
-  const saveDraft = () => {
-    toast({
-      title: "Draft saved!",
-      description: "Your post has been saved to drafts",
-    })
+  const saveDraft = async () => {
+    try {
+      const response = await fetch('/api/posts', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          title: postTitle,
+          body: postBody,
+          tldr: postTldr,
+          subreddit_name: selectedSubreddit,
+          subreddit_display_name: selectedSubreddit,
+          tone: selectedTone,
+          status: 'draft'
+        }),
+      })
+
+      if (response.ok) {
+        toast({
+          title: "Draft saved!",
+          description: "Your post has been saved to drafts",
+        })
+      } else {
+        throw new Error('Failed to save draft')
+      }
+    } catch (error) {
+      console.error('Error saving draft:', error)
+      toast({
+        title: "Error",
+        description: "Failed to save draft. Please try again.",
+        variant: "destructive",
+      })
+    }
   }
 
   const selectedSubredditData = savedSubreddits.find((s) => s.subreddit_name === selectedSubreddit)
@@ -137,7 +168,55 @@ export default function CreatePostPage() {
       </div>
 
       <div className="max-w-3xl">
-        {!postGenerated ? (
+        {postSubmitted ? (
+          /* Success Screen */
+          <Card>
+            <CardContent className="pt-6">
+              <div className="text-center space-y-4">
+                <CheckCircle className="h-16 w-16 text-green-500 mx-auto" />
+                <h2 className="text-2xl font-bold">Post Submitted Successfully!</h2>
+                <p className="text-muted-foreground">
+                  Your post has been published to {selectedSubreddit}
+                </p>
+                
+                <div className="pt-4 space-y-3">
+                  {submittedPostUrl && (
+                    <Button 
+                      className="w-full"
+                      onClick={() => window.open(submittedPostUrl, '_blank')}
+                    >
+                      <ExternalLink className="h-4 w-4 mr-2" />
+                      View Post on Reddit
+                    </Button>
+                  )}
+                  
+                  <Link href="/dashboard" className="block">
+                    <Button variant="outline" className="w-full">
+                      Back to Dashboard
+                    </Button>
+                  </Link>
+                  
+                  <Button 
+                    variant="outline" 
+                    className="w-full"
+                    onClick={() => {
+                      setPostGenerated(false)
+                      setPostSubmitted(false)
+                      setPostTitle("")
+                      setPostBody("")
+                      setPostTldr("")
+                      setProductDescription("")
+                      setSelectedSubreddit("")
+                      setSelectedTone("")
+                    }}
+                  >
+                    Create Another Post
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        ) : !postGenerated ? (
           /* Setup Form */
           <Card>
             <CardHeader>
@@ -332,26 +411,31 @@ export default function CreatePostPage() {
                       }
 
                       const result = await response.json()
-                      if (result.json?.data?.url) {
-                        toast({
-                          title: "Success!",
-                          description: "Your post has been submitted to Reddit",
-                          action: (
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => window.open(result.json.data.url, '_blank')}
-                            >
-                              View Post
-                            </Button>
-                          ),
-                        })
-                      } else {
-                        toast({
-                          title: "Success!",
-                          description: "Your post has been submitted to Reddit",
-                        })
-                      }
+                      const postUrl = result.json?.data?.url
+                      const postId = result.json?.data?.id
+                      
+                      // Save the post to database
+                      await fetch('/api/posts', {
+                        method: 'POST',
+                        headers: {
+                          'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                          title: postTitle,
+                          body: postBody,
+                          tldr: postTldr,
+                          subreddit_name: selectedSubreddit,
+                          subreddit_display_name: selectedSubreddit,
+                          tone: selectedTone,
+                          status: 'published',
+                          reddit_post_id: postId,
+                          reddit_post_url: postUrl,
+                          submitted_at: new Date().toISOString()
+                        }),
+                      })
+                      
+                      setSubmittedPostUrl(postUrl || '')
+                      setPostSubmitted(true)
                     } catch (error) {
                       toast({
                         title: "Error",

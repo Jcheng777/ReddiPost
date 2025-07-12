@@ -25,6 +25,24 @@ export interface SavedSubreddit {
   created_at: string
 }
 
+export interface Post {
+  id: string
+  user_id: string
+  reddit_post_id?: string
+  reddit_post_url?: string
+  title: string
+  body: string
+  tldr?: string
+  subreddit_name: string
+  subreddit_display_name: string
+  tone?: string
+  status: 'draft' | 'published' | 'scheduled'
+  upvotes: number
+  created_at: string
+  submitted_at?: string
+  scheduled_for?: string
+}
+
 export interface Collection {
   id: string
   user_reddit_id: string
