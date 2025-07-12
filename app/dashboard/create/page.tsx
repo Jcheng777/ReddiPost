@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Copy, ThumbsUp, ArrowLeft, Sparkles } from "lucide-react"
+import { Copy, ThumbsUp, ArrowLeft, Sparkles, Send } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { toast } from "@/components/ui/use-toast"
 import { Toaster } from "@/components/ui/toaster"
@@ -19,6 +19,7 @@ export default function CreatePostPage() {
   const [postTldr, setPostTldr] = useState("")
   const [loading, setLoading] = useState(false)
   const [postGenerated, setPostGenerated] = useState(false)
+  const [submitting, setSubmitting] = useState(false)
 
   // Mock saved subreddits - in a real app, this would come from user's saved collections
   const savedSubreddits = [
@@ -61,7 +62,7 @@ export default function CreatePostPage() {
     { value: "free-tool", label: "Free Tool Drop", description: "Share a free resource with the community" },
   ]
 
-  const handleGeneratePost = () => {
+  const handleGeneratePost = async () => {
     if (!selectedSubreddit || !selectedTone) {
       toast({
         title: "Missing information",
@@ -72,41 +73,40 @@ export default function CreatePostPage() {
     }
 
     setLoading(true)
-    // Simulate API call
-    setTimeout(() => {
-      setLoading(false)
-      setPostGenerated(true)
+    try {
+      // For now, using a placeholder product description
+      const response = await fetch('/api/generate-post', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          productDescription: "a tool that helps Reddit users generate engaging posts",
+          subreddit: selectedSubreddit,
+          tone: selectedTone,
+        }),
+      })
 
-      // Mock generated content based on selected subreddit and tone
-      const subreddit = savedSubreddits.find((s) => s.name === selectedSubreddit)
-      const tones = {
-        "founder-story": {
-          title: `I built a tool to solve [problem] after struggling with it myself`,
-          body: `Hey ${selectedSubreddit.substring(2)},\n\nAfter months of frustration with existing solutions, I decided to build something better. The journey wasn't easy - I spent countless nights coding and redesigning based on user feedback.\n\nI'd love to hear what you think and if this solves a pain point for you too. What features would you like to see added?\n\n[Your product link here]`,
-          tldr: "Built a tool to solve my own problem, would love your feedback!",
-        },
-        feedback: {
-          title: `[Feedback Request] Would this solve your problem?`,
-          body: `Hi ${selectedSubreddit.substring(2)},\n\nI've been working on a solution for [problem] and would really appreciate honest feedback from this community.\n\n[Brief description of your product]\n\nWhat works? What doesn't? Would you use this?\n\nThanks in advance for any insights!`,
-          tldr: "Built a new tool, seeking honest feedback before I continue development.",
-        },
-        question: {
-          title: `Has anyone found a good solution for [your problem]?`,
-          body: `I've been struggling with [problem] for a while now and curious if anyone here has experience with similar challenges?\n\nI'm considering building something myself, but wanted to see what's already out there.\n\nWhat worked for you? Any pitfalls I should be aware of?`,
-          tldr: "Looking for solutions to [problem], considering building something myself.",
-        },
-        "free-tool": {
-          title: `I made a free tool that [main benefit] - no strings attached`,
-          body: `Hey ${selectedSubreddit.substring(2)},\n\nI wanted to share something I built that might be useful for this community.\n\n[Brief description of your tool and its benefits]\n\nIt's completely free to use. I built it because I needed it myself and thought others might benefit too.\n\nLink: [your-link-here]\n\nLet me know what you think or if you have feature suggestions!`,
-          tldr: "Free tool for [benefit] - no account required, feedback welcome!",
-        },
+      if (!response.ok) {
+        throw new Error('Failed to generate post')
       }
 
-      const selectedToneData = tones[selectedTone] || tones["founder-story"]
-      setPostTitle(selectedToneData.title)
-      setPostBody(selectedToneData.body)
-      setPostTldr(selectedToneData.tldr)
-    }, 1500)
+      const data = await response.json()
+      const post = data.post
+      
+      setPostTitle(post.title)
+      setPostBody(post.body)
+      setPostTldr(post.tldr)
+      setPostGenerated(true)
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to generate post. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setLoading(false)
+    }
   }
 
   const copyToClipboard = (text: string) => {
@@ -295,15 +295,70 @@ export default function CreatePostPage() {
                   Copy Full Post
                 </Button>
                 <Button
-                  onClick={() => {
-                    toast({
-                      title: "Success!",
-                      description: "Your post is ready to share on Reddit",
-                    })
+                  onClick={async () => {
+                    setSubmitting(true)
+                    try {
+                      const response = await fetch('/api/reddit/submit', {
+                        method: 'POST',
+                        headers: {
+                          'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                          subreddit: selectedSubreddit.replace('r/', ''),
+                          title: postTitle,
+                          content: `${postBody}\n\nTL;DR: ${postTldr}`,
+                          kind: 'self',
+                        }),
+                      })
+
+                      if (!response.ok) {
+                        throw new Error('Failed to submit post')
+                      }
+
+                      const result = await response.json()
+                      if (result.json?.data?.url) {
+                        toast({
+                          title: "Success!",
+                          description: "Your post has been submitted to Reddit",
+                          action: (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => window.open(result.json.data.url, '_blank')}
+                            >
+                              View Post
+                            </Button>
+                          ),
+                        })
+                      } else {
+                        toast({
+                          title: "Success!",
+                          description: "Your post has been submitted to Reddit",
+                        })
+                      }
+                    } catch (error) {
+                      toast({
+                        title: "Error",
+                        description: "Failed to submit post to Reddit. Please try again.",
+                        variant: "destructive",
+                      })
+                    } finally {
+                      setSubmitting(false)
+                    }
                   }}
+                  disabled={submitting}
                 >
-                  <ThumbsUp className="h-4 w-4 mr-2" />
-                  Looks Good
+                  {submitting ? (
+                    <>
+                      <Send className="h-4 w-4 mr-2 animate-pulse" />
+                      Submitting...
+                    </>
+                  ) : (
+                    <>
+                      <Send className="h-4 w-4 mr-2" />
+                      Submit to Reddit
+                    </>
+                  )}
                 </Button>
               </div>
             </CardFooter>
