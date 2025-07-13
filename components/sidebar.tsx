@@ -27,7 +27,7 @@ export function Sidebar() {
     >
       {/* Sidebar Header */}
       <div className="flex h-16 items-center justify-between px-4 border-b">
-        {!collapsed && <span className="text-lg font-semibold">RedditCraft</span>}
+        {!collapsed && <span className="text-lg font-semibold">ReddiPost</span>}
         <Button variant="ghost" size="sm" onClick={() => setCollapsed(!collapsed)} className="h-8 w-8 p-0">
           {collapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
         </Button>

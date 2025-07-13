@@ -13,7 +13,7 @@ export function Navbar() {
           <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary">
             <MessageSquare className="h-5 w-5 text-primary-foreground" />
           </div>
-          <span className="text-xl font-bold">RedditCraft</span>
+          <span className="text-xl font-bold">ReddiPost</span>
         </Link>
 
         {/* Navigation Links */}

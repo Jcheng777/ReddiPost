@@ -7,7 +7,7 @@ import { Providers } from "@/components/providers"
 const inter = Inter({ subsets: ["latin"] })
 
 export const metadata = {
-  title: "RedditCraft - Reddit Post Generator",
+  title: "ReddiPost - Reddit Post Generator",
   description: "Find relevant subreddits and generate posts that match community guidelines",
     generator: 'v0.dev'
 }
