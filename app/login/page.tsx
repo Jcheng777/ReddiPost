@@ -3,9 +3,9 @@
 import { useEffect, useState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { ExternalLink, AlertCircle } from "lucide-react"
+import Link from "next/link"
 
 export default function LoginPage() {
   const router = useRouter()
@@ -65,56 +65,97 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background p-4">
-      <Card className="w-full max-w-md">
-        <CardHeader className="text-center">
-          <CardTitle className="text-2xl font-bold">Welcome to ReddiPost</CardTitle>
-          <CardDescription>
-            Connect your Reddit account to start creating engaging posts with AI
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
+    <div className="min-h-screen bg-gradient-to-b from-slate-900 via-blue-900 to-blue-950">
+      {/* Navigation */}
+      <nav className="p-6">
+        <div className="container mx-auto flex items-center justify-between">
+          <Link href="/" className="flex items-center space-x-2">
+            <div className="w-8 h-8 bg-purple-600 rounded-lg flex items-center justify-center">
+              <span className="text-white font-bold text-lg">R</span>
+            </div>
+            <span className="text-white font-semibold text-lg">ReddiPost</span>
+          </Link>
+          <Link href="/" className="text-gray-300 hover:text-white transition-colors text-sm">
+            Back to Home
+          </Link>
+        </div>
+      </nav>
+
+      {/* Main content */}
+      <div className="flex items-center justify-center px-4 pb-20" style={{ minHeight: 'calc(100vh - 88px)' }}>
+        <div className="w-full max-w-md space-y-8 text-center">
+          {/* Logo */}
+          <div className="w-20 h-20 bg-purple-600 rounded-full mx-auto flex items-center justify-center">
+            <span className="text-white font-bold text-3xl">R</span>
+          </div>
+
+          {/* Title and subtitle */}
+          <div className="space-y-2">
+            <h1 className="text-3xl font-bold text-white">Welcome to ReddiPost</h1>
+            <p className="text-gray-300">Connect your Reddit account to get started</p>
+          </div>
+
           {error && (
-            <Alert variant="destructive">
+            <Alert variant="destructive" className="bg-red-900/20 border-red-800 text-red-200">
               <AlertCircle className="h-4 w-4" />
               <AlertDescription>{error}</AlertDescription>
             </Alert>
           )}
 
-          <div className="space-y-4">
-            <div className="text-sm text-muted-foreground space-y-2">
-              <p>ReddiPost will request the following permissions:</p>
-              <ul className="list-disc list-inside space-y-1 ml-4">
-                <li>View your Reddit username</li>
-                <li>Read your posts and comments</li>
-                <li>Submit posts on your behalf</li>
-                <li>Edit your posts</li>
-              </ul>
-            </div>
+          {/* Login button */}
+          <Button
+            onClick={handleLogin}
+            disabled={loading}
+            className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white py-6"
+            size="lg"
+          >
+            {loading ? (
+              "Redirecting to Reddit..."
+            ) : (
+              <>
+                Continue with Reddit
+                <ExternalLink className="ml-2 h-5 w-5" />
+              </>
+            )}
+          </Button>
 
-            <Button
-              onClick={handleLogin}
-              disabled={loading}
-              className="w-full"
-              size="lg"
-            >
-              {loading ? (
-                "Redirecting to Reddit..."
-              ) : (
-                <>
-                  Continue with Reddit
-                  <ExternalLink className="ml-2 h-4 w-4" />
-                </>
-              )}
-            </Button>
+          {/* Permissions */}
+          <div className="space-y-3 text-left">
+            <p className="text-gray-300 text-sm font-medium">We'll request these permissions:</p>
+            <ul className="space-y-2 text-gray-400 text-sm ml-4">
+              <li className="flex items-start">
+                <span className="mr-2">•</span>
+                <span>View your Reddit username</span>
+              </li>
+              <li className="flex items-start">
+                <span className="mr-2">•</span>
+                <span>Read your posts and comments</span>
+              </li>
+              <li className="flex items-start">
+                <span className="mr-2">•</span>
+                <span>Submit posts on your behalf</span>
+              </li>
+            </ul>
+          </div>
 
-            <p className="text-xs text-center text-muted-foreground">
-              By continuing, you agree to ReddiPost's terms of service and privacy policy.
+          {/* Footer */}
+          <div className="pt-4 space-y-2">
+            <p className="text-xs text-gray-400 text-center">
+              By continuing, you agree to our{" "}
+              <Link href="/terms" className="text-gray-300 hover:text-white underline">
+                Terms
+              </Link>
+              {" and "}
+              <Link href="/privacy" className="text-gray-300 hover:text-white underline">
+                Privacy Policy
+              </Link>
+            </p>
+            <p className="text-xs text-gray-500 text-center">
               Your Reddit credentials are never stored by ReddiPost.
             </p>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
     </div>
   )
 }
