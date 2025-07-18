@@ -156,7 +156,8 @@ export default function DiscoverPage() {
         },
         body: JSON.stringify({ 
           keywords, 
-          limit: 20
+          limit: 20,
+          productDescription // Include for semantic scoring
         }),
       })
       console.log('Search response status:', searchResponse.status)

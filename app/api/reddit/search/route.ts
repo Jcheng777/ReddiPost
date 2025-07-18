@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { redditAPI } from '@/lib/reddit-api';
 import { getSession } from '@/lib/auth';
+import { generateEmbedding, generateEmbeddings, cosineSimilarity } from '@/lib/embeddings';
 
 console.log('Reddit search route loaded');
 
@@ -14,14 +15,14 @@ export async function POST(request: Request) {
   }
 
   try {
-    const { keywords, limit = 10 } = await request.json();
+    const { keywords, limit = 10, productDescription } = await request.json();
 
     if (!keywords || keywords.length === 0) {
       return NextResponse.json({ error: 'Keywords are required' }, { status: 400 });
     }
 
     // Search for subreddits using the keywords
-    const subreddits = await searchSubreddits(keywords, limit);
+    const subreddits = await searchSubreddits(keywords, limit, productDescription);
 
     return NextResponse.json({ subreddits });
   } catch (error: any) {
@@ -33,7 +34,7 @@ export async function POST(request: Request) {
   }
 }
 
-async function searchSubreddits(keywords: string[], limit: number) {
+async function searchSubreddits(keywords: string[], limit: number, productDescription?: string) {
   try {
     // Make separate API calls for each keyword
     console.log('Searching subreddits with keywords:', keywords);
@@ -142,6 +143,7 @@ async function searchSubreddits(keywords: string[], limit: number) {
             allowsVideos: aboutData.data?.allow_videos || false,
             allowsImages: aboutData.data?.allow_images || false,
             submissionType: aboutData.data?.submission_type || 'any',
+            subredditType: aboutData.data?.subreddit_type || 'public',
             rules: [],
             relevanceScore: calculateRelevance(subredditData, keywords, keywordMatchCount.get(subredditData.display_name) || [])
           };
@@ -159,6 +161,7 @@ async function searchSubreddits(keywords: string[], limit: number) {
             allowsVideos: true,
             allowsImages: true,
             submissionType: 'any',
+            subredditType: 'public',
             rules: [],
             relevanceScore: calculateRelevance(subredditData, keywords, keywordMatchCount.get(subredditData.display_name) || [])
           };
@@ -170,8 +173,75 @@ async function searchSubreddits(keywords: string[], limit: number) {
     const filteredSubreddits = subreddits.filter(sub => sub !== null);
     console.log(`Filtered out ${subreddits.length - filteredSubreddits.length} over18 subreddits`);
 
+    // Apply semantic scoring if product description is provided
+    let scoredSubreddits = filteredSubreddits;
+    if (productDescription && filteredSubreddits.length > 0) {
+      console.log('\n=== Applying Semantic Scoring ===');
+      console.log('Product description:', productDescription);
+      
+      try {
+        // Generate embedding for product description
+        const productEmbedding = await generateEmbedding(productDescription);
+        console.log('Generated product description embedding');
+        
+        // Prepare subreddit texts
+        const subredditTexts = filteredSubreddits.map(sub => {
+          const title = sub.title || sub.displayName || '';
+          const desc = sub.description || '';
+          return `${title}. ${desc}`.trim();
+        });
+        
+        // Generate embeddings for all subreddits in batch
+        console.log(`Generating embeddings for ${subredditTexts.length} subreddits...`);
+        const subredditEmbeddings = await generateEmbeddings(subredditTexts);
+        
+        // Calculate semantic scores and update relevance scores
+        scoredSubreddits = filteredSubreddits.map((sub, index) => {
+          const semanticScore = cosineSimilarity(productEmbedding, subredditEmbeddings[index]);
+          
+          // Base score: 80% semantic
+          let score = semanticScore * 100 * 0.8;
+          
+          // Add 10% for subscriber count
+          if (sub.subscribers >= 1000) {
+            score += 10; // Active community bonus
+          } else {
+            score += 5; // Small community, still gets some points
+          }
+          
+          // Add 10% for public subreddits
+          const subredditType = sub.subredditType || 'public';
+          if (subredditType === 'public') {
+            score += 10; // Public/open community bonus
+          } else if (subredditType === 'restricted') {
+            score += 5; // Restricted gets half bonus
+          }
+          // Private gets 0 bonus
+          
+          const finalScore = Math.round(score);
+          
+          console.log(`r/${sub.displayName}:`);
+          console.log(`  - Semantic: ${Math.round(semanticScore * 100)}%`);
+          console.log(`  - Subscribers: ${sub.subscribers.toLocaleString()} (${sub.subscribers >= 1000 ? '+10%' : '+5%'})`);
+          console.log(`  - Type: ${sub.submissionType} (${sub.submissionType === 'public' || sub.submissionType === 'any' ? '+10%' : sub.submissionType === 'restricted' ? '+5%' : '+0%'})`);
+          console.log(`  - Final Score: ${finalScore}%`);
+          
+          return {
+            ...sub,
+            relevanceScore: finalScore
+          };
+        });
+        
+        console.log('Semantic scoring completed successfully');
+      } catch (error) {
+        console.error('Error during semantic scoring:', error);
+        console.log('Falling back to keyword-only scores');
+        scoredSubreddits = filteredSubreddits;
+      }
+    }
+
     // Sort by relevance score and limit to requested number
-    const finalResults = filteredSubreddits
+    const finalResults = scoredSubreddits
       .sort((a, b) => b.relevanceScore - a.relevanceScore)
       .slice(0, limit);
     
