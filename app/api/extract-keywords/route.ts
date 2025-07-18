@@ -25,23 +25,24 @@ export async function POST(request: Request) {
         messages: [
           {
             role: "system",
-            content: `You are a Reddit subreddit discovery expert. Extract the most relevant SINGLE-WORD keywords from a product description that would help find appropriate subreddits.
-            
-Focus on extracting individual words like:
-- Technology names (React, Python, JavaScript, Node, AWS)
-- Industry terms (fintech, edtech, healthcare, ecommerce)
-- Audience (developers, entrepreneurs, designers, marketers)
-- Product types (SaaS, app, tool, platform, extension, API)
-- Core concepts (automation, analytics, productivity, collaboration)
+            content: `You are a Reddit subreddit discovery expert. Extract 1-3 MAIN THEME keywords from a product description that capture the core essence of what the product is about.
+
+Focus on identifying the PRIMARY theme, not every possible keyword. Think about what subreddit communities would be most relevant.
+
+Examples:
+- "AI app for HR to screen candidates" → ["recruiting", "hiring", "hr"]
+- "Budgeting app for college students" → ["personalfinance", "college", "budgeting"]
+- "Tool for React developers to debug performance" → ["reactjs", "webdev", "javascript"]
+- "Platform for musicians to collaborate remotely" → ["wearethemusicmakers", "musicproduction", "musicians"]
 
 Rules:
-- ONLY single words, NO phrases
+- Extract 1-3 keywords maximum that represent the MAIN theme
+- Can be single words or common subreddit-style terms (like "personalfinance", "reactjs")
 - Lowercase all keywords
-- No generic words like "help", "make", "use", "build"
-- Prioritize specific technical terms and industry keywords
-- Return 8-12 keywords maximum
+- Focus on terms that actual subreddit names might contain
+- Avoid overly generic terms unless they're the core theme
 
-Return as JSON: {"keywords": ["keyword1", "keyword2", ...]}`
+Return as JSON: {"keywords": ["keyword1", "keyword2", "keyword3"]}`
           },
           {
             role: "user",
@@ -54,12 +55,13 @@ Return as JSON: {"keywords": ["keyword1", "keyword2", ...]}`
       });
 
       const response = completion.choices[0].message.content;
-      console.log('GPT Response:', response);
-      
       const parsed = JSON.parse(response || '{"keywords": []}');
       keywords = parsed.keywords || [];
       
-      console.log('Extracted keywords from GPT:', keywords);
+      console.log('\n=== Keyword Extraction ===');
+      console.log('Product description:', productDescription);
+      console.log('Extracted keywords:', keywords);
+      console.log('Extraction method: GPT-3.5');
 
       // Fallback to basic extraction if GPT fails or returns empty
       if (keywords.length === 0) {
@@ -70,6 +72,10 @@ Return as JSON: {"keywords": ["keyword1", "keyword2", ...]}`
       console.error('OpenAI error, falling back to basic extraction:', openAIError);
       // Fallback to basic keyword extraction
       keywords = extractKeywords(productDescription);
+      console.log('\n=== Keyword Extraction ===');
+      console.log('Product description:', productDescription);
+      console.log('Extracted keywords:', keywords);
+      console.log('Extraction method: Fallback (word frequency)');
     }
 
     return NextResponse.json({ keywords });
@@ -126,7 +132,7 @@ function extractKeywords(text: string): string[] {
       score: freq * (techKeywords.has(word) ? 2 : 1)
     }))
     .sort((a, b) => b.score - a.score)
-    .slice(0, 12)
+    .slice(0, 3)
     .map(item => item.word);
 
   // Return unique keywords

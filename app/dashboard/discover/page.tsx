@@ -113,7 +113,11 @@ export default function DiscoverPage() {
   }
 
   const handleGetRecommendations = async () => {
+    console.log('=== handleGetRecommendations called ===')
+    console.log('Product description:', productDescription)
+    
     if (!productDescription.trim()) {
+      console.log('No product description - showing toast')
       toast({
         title: "Product description required",
         description: "Please describe your product to get personalized recommendations",
@@ -122,6 +126,7 @@ export default function DiscoverPage() {
       return
     }
 
+    console.log('Setting loading state to true')
     setLoading(true)
 
     try {
@@ -139,15 +144,22 @@ export default function DiscoverPage() {
       }
 
       const { keywords } = await keywordResponse.json()
+      console.log('Extracted keywords:', keywords)
 
       // Step 2: Search Reddit for relevant subreddits
+      console.log('Searching Reddit with keywords:', keywords)
+      console.log('Making request to /api/reddit/search')
       const searchResponse = await fetch('/api/reddit/search', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ keywords, limit: 20 }),
+        body: JSON.stringify({ 
+          keywords, 
+          limit: 20
+        }),
       })
+      console.log('Search response status:', searchResponse.status)
 
       if (!searchResponse.ok) {
         throw new Error('Failed to search subreddits')

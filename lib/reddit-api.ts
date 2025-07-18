@@ -146,15 +146,18 @@ class RedditAPI {
   }
 
   async searchSubreddits(query: string, limit: number = 10) {
+    console.log(`[Reddit API] Searching for: "${query}" with limit: ${limit}`);
     const response = await this.axiosInstance.get('/subreddits/search', {
       params: {
         q: query,
         limit: limit,
         type: 'sr',
         sort: 'relevance',
+        exact: false,
+        include_over_18: false,
       },
     });
-
+    console.log(`[Reddit API] Response status: ${response.status}`);
     return response.data;
   }
 
